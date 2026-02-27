@@ -8,7 +8,6 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,7 +28,8 @@ def get_driver():
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/124.0.0.0 Safari/537.36"
     )
-    service = Service(ChromeDriverManager().install())
+    # Use system chromedriver installed by GitHub Actions
+    service = Service("/usr/bin/chromedriver")
     driver = webdriver.Chrome(service=service, options=options)
     driver.execute_script(
         "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
@@ -56,9 +56,11 @@ def login_to_x(driver):
     user_input.send_keys(Keys.ENTER)
     time.sleep(3)
 
-    # Handle possible "Enter phone/email" extra step
+    # Handle possible extra verification step
     try:
-        extra = driver.find_element(By.CSS_SELECTOR, 'input[data-testid="ocfEnterTextTextInput"]')
+        extra = driver.find_element(
+            By.CSS_SELECTOR, 'input[data-testid="ocfEnterTextTextInput"]'
+        )
         extra.send_keys(username)
         extra.send_keys(Keys.ENTER)
         time.sleep(3)
@@ -126,7 +128,7 @@ def post_tweet_thread(tweets: list, image_path: str = None) -> bool:
         print(f"[SELENIUM] Error: {e}")
         try:
             driver.save_screenshot("/tmp/selenium_error.png")
-            print("[SELENIUM] Screenshot saved to /tmp/selenium_error.png")
+            print("[SELENIUM] Screenshot saved")
         except:
             pass
         return False
