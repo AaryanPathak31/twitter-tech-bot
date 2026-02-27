@@ -35,10 +35,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Install Chrome
+      - name: Install Chrome and ChromeDriver
         run: |
           sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+          sudo apt-get install -y google-chrome-stable chromium-driver
+          sudo ln -sf /usr/bin/chromedriver /usr/bin/chromedriver
+          chromedriver --version
+          google-chrome --version
+
 
       - name: Run Tech News Bot
         env:
