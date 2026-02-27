@@ -48,7 +48,7 @@ def generate_tweet(article: dict) -> dict:
 
     try:
         response = client.chat.completions.create(
-            model="llama3-8b-8192",  # free, fast model on Groq
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=500,
             temperature=0.7,
