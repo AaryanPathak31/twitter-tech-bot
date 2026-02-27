@@ -38,11 +38,9 @@ jobs:
       - name: Install Chrome and ChromeDriver
         run: |
           sudo apt-get update
-          sudo apt-get install -y google-chrome-stable chromium-driver
-          sudo ln -sf /usr/bin/chromedriver /usr/bin/chromedriver
-          chromedriver --version
-          google-chrome --version
-
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+          which chromedriver || echo "chromedriver not found"
+          chromedriver --version || true
 
       - name: Run Tech News Bot
         env:
