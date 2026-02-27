@@ -50,6 +50,13 @@ jobs:
         run: |
           python main.py
 
+      - name: Upload debug screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-screenshots
+          path: /tmp/s*.png
+
       - name: Commit updated posted_ids.json
         run: |
           git config --global user.name "github-actions[bot]"
