@@ -28,8 +28,16 @@ def get_driver():
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/124.0.0.0 Safari/537.36"
     )
-    # Use system chromedriver installed by GitHub Actions
-    service = Service("/usr/bin/chromedriver")
+
+    # Find chromedriver automatically
+    import shutil
+    chromedriver_path = (
+        shutil.which("chromedriver") or
+        "/usr/bin/chromedriver" or
+        "/snap/bin/chromium.chromedriver"
+    )
+    print(f"[SELENIUM] Using chromedriver at: {chromedriver_path}")
+    service = Service(chromedriver_path)
     driver = webdriver.Chrome(service=service, options=options)
     driver.execute_script(
         "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
