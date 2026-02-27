@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-model = genai.GenerativeModel("gemini-1.5-flash")  # free tier model
+model = genai.GenerativeModel("gemini-2.0-flash")  
 
 
 TWEET_PROMPT = """
