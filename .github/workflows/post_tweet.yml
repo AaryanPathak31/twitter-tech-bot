@@ -1,0 +1,83 @@
+name: Daily Tech News Bot
+
+on:
+  # Runs every day at 9:00 AM UTC (2:30 PM IST)
+  schedule:
+    - cron: '0 9,18 * * *'
+
+  # Allows you to run manually from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  post-tweet:
+    runs-on: ubuntu-latest
+    
+    # Give Actions permission to write back to your repo
+    permissions:
+      contents: write
+
+    steps:
+
+      # ── Step 1: Download your repo code ──────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Step 2: Install Python ────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ── Step 3: Cache pip packages (speeds up future runs) ─
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # ── Step 4: Install your Python libraries ─────────────
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ── Step 5: Run your bot ──────────────────────────────
+      - name: Run Tech News Bot
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+        run: |
+          python main.py
+
+      # ── Step 6: Save updated dedup log back to GitHub ─────
+      - name: Commit updated posted_ids.json
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/posted_ids.json
+          git diff --staged --quiet || git commit -m "🤖 Bot run: updated posted_ids.json [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+---
+
+## 4B: Understanding the Cron Schedule
+```
+'0 9 * * *'
+ │ │ │ │ │
+ │ │ │ │ └── Day of week (any)
+ │ │ │ └──── Month (any)
+ │ │ └────── Day of month (any)
+ │ └──────── Hour (9 = 9AM UTC)
+ └────────── Minute (0)
