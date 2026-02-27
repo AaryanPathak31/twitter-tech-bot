@@ -1,106 +1,107 @@
 # bot/poster.py
-import tweepy
 import os
 import time
+import subprocess
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from dotenv import load_dotenv
 
 load_dotenv()
 
-
-def get_twitter_client():
-    """Initialize Tweepy client with credentials from environment."""
-    client = tweepy.Client(
-        bearer_token=os.environ["X_BEARER_TOKEN"],
-        consumer_key=os.environ["X_API_KEY"],
-        consumer_secret=os.environ["X_API_SECRET"],
-        access_token=os.environ["X_ACCESS_TOKEN"],
-        access_token_secret=os.environ["X_ACCESS_TOKEN_SECRET"],
-        wait_on_rate_limit=True,
-    )
-    return client
+def get_driver():
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36")
+    driver = webdriver.Chrome(options=options)
+    return driver
 
 
-def get_twitter_api_v1():
-    """
-    Initialize Tweepy v1.1 API — needed ONLY for media upload.
-    (Media upload still uses v1.1 endpoint even on free tier)
-    """
-    auth = tweepy.OAuth1UserHandler(
-        os.environ["X_API_KEY"],
-        os.environ["X_API_SECRET"],
-        os.environ["X_ACCESS_TOKEN"],
-        os.environ["X_ACCESS_TOKEN_SECRET"],
-    )
-    return tweepy.API(auth)
+def login_to_x(driver):
+    """Log in to X using credentials from environment."""
+    username = os.environ["X_USERNAME"]
+    password = os.environ["X_PASSWORD"]
 
+    print("[SELENIUM] Navigating to X login...")
+    driver.get("https://x.com/i/flow/login")
+    time.sleep(4)
 
-def upload_image(image_path: str) -> str | None:
-    """Upload image using v1.1 API. Returns media_id string."""
-    if not image_path or not os.path.exists(image_path):
-        return None
-    try:
-        api_v1 = get_twitter_api_v1()
-        media = api_v1.media_upload(filename=image_path)
-        print(f"[POSTER] Uploaded image, media_id: {media.media_id_string}")
-        return media.media_id_string
-    except Exception as e:
-        print(f"[POSTER] Image upload failed: {e}")
-        return None
+    # Enter username
+    wait = WebDriverWait(driver, 15)
+    user_input = wait.until(EC.presence_of_element_located(
+        (By.CSS_SELECTOR, 'input[autocomplete="username"]')
+    ))
+    user_input.send_keys(username)
+    user_input.send_keys(Keys.ENTER)
+    time.sleep(3)
+
+    # Enter password
+    pass_input = wait.until(EC.presence_of_element_located(
+        (By.CSS_SELECTOR, 'input[name="password"]')
+    ))
+    pass_input.send_keys(password)
+    pass_input.send_keys(Keys.ENTER)
+    time.sleep(5)
+    print("[SELENIUM] Logged in successfully")
 
 
 def post_tweet_thread(tweets: list, image_path: str = None) -> bool:
-    """
-    Post a thread of tweets. Attaches image to the first tweet only.
-    Returns True on success, False on failure.
-    """
-    client = get_twitter_client()
-    previous_tweet_id = None
+    """Post tweets using Selenium browser automation."""
+    driver = get_driver()
 
-    for i, tweet_text in enumerate(tweets):
-        # Only attach image to first tweet
-        media_ids = None
-        if i == 0 and image_path:
-            media_id = upload_image(image_path)
-            if media_id:
-                media_ids = [media_id]
+    try:
+        login_to_x(driver)
 
-        try:
-            if previous_tweet_id:
-                # Reply to previous tweet to form thread
-                response = client.create_tweet(
-                    text=tweet_text,
-                    in_reply_to_tweet_id=previous_tweet_id,
-                    media_ids=media_ids,
-                )
-            else:
-                response = client.create_tweet(
-                    text=tweet_text,
-                    media_ids=media_ids,
-                )
+        for i, tweet_text in enumerate(tweets):
+            print(f"[SELENIUM] Posting tweet {i+1}...")
+            driver.get("https://x.com/compose/tweet")
+            time.sleep(4)
 
-            previous_tweet_id = response.data["id"]
-            print(f"[POSTER] Tweet {i+1} posted. ID: {previous_tweet_id}")
+            wait = WebDriverWait(driver, 15)
+            tweet_box = wait.until(EC.presence_of_element_located(
+                (By.CSS_SELECTOR, '[data-testid="tweetTextarea_0"]')
+            ))
+            tweet_box.click()
+            tweet_box.send_keys(tweet_text)
+            time.sleep(2)
 
-            # Wait between thread tweets to avoid rate limits
+            # Attach image to first tweet only
+            if i == 0 and image_path and os.path.exists(image_path):
+                try:
+                    file_input = driver.find_element(
+                        By.CSS_SELECTOR, 'input[data-testid="fileInput"]'
+                    )
+                    file_input.send_keys(os.path.abspath(image_path))
+                    time.sleep(4)
+                    print("[SELENIUM] Image attached")
+                except Exception as e:
+                    print(f"[SELENIUM] Image attach failed: {e}")
+
+            # Click Post button
+            post_btn = wait.until(EC.element_to_be_clickable(
+                (By.CSS_SELECTOR, '[data-testid="tweetButtonInline"]')
+            ))
+            post_btn.click()
+            time.sleep(4)
+            print(f"[SELENIUM] Tweet {i+1} posted!")
+
+            # Space out thread tweets
             if i < len(tweets) - 1:
-                time.sleep(3)
+                time.sleep(5)
 
-        except tweepy.TweepyException as e:
-            print(f"[POSTER] Failed to post tweet {i+1}: {e}")
-            # If first tweet fails, abort whole thread
-            if i == 0:
-                return False
-            # If follow-up fails, partial success is OK
-            break
+        return True
 
-    return True
+    except Exception as e:
+        print(f"[SELENIUM] Error: {e}")
+        driver.save_screenshot("/tmp/selenium_error.png")
+        return False
 
-
-if __name__ == "__main__":
-    # Quick test (will post a real tweet if keys are set)
-    test_tweets = [
-        "🧪 This is a test tweet from my bot. Ignore! #testing",
-        "2/ This is the second tweet in the test thread.",
-    ]
-    result = post_tweet_thread(test_tweets)
-    print(f"Post result: {result}")
+    finally:
+        driver.quit()
