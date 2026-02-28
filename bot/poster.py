@@ -74,124 +74,107 @@ def login_to_x(driver):
     driver.get("https://x.com/i/flow/login")
     time.sleep(8)
 
-    # Screenshot to see what page loaded
-    driver.save_screenshot("/tmp/s0_loginpage.png")
-    print(f"[SELENIUM] Page title: {driver.title}")
-    print(f"[SELENIUM] Current URL: {driver.current_url}")
-
     # ── Username ──────────────────────────────────────────
     print("[SELENIUM] Typing username...")
     try:
-        el = wait_and_find(driver, 'input[autocomplete="username"]')
-        js_type(driver, el, username)
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, 'input[autocomplete="username"]')
+            )
+        )
+        time.sleep(3)
+        el = driver.find_element(By.CSS_SELECTOR, 'input[autocomplete="username"]')
+        js_click(driver, el)
+        time.sleep(1)
+        # Clear field first
+        driver.execute_script("arguments[0].value = '';", el)
+        # Type username
+        for char in username:
+            el.send_keys(char)
+            time.sleep(0.1)
         time.sleep(2)
-        driver.save_screenshot("/tmp/s1_after_username.png")
+        driver.save_screenshot("/tmp/s1_username_typed.png")
 
-        # Find and click Next button
-        all_buttons = driver.find_elements(By.XPATH, '//button | //div[@role="button"]')
-        print(f"[SELENIUM] Found {len(all_buttons)} buttons")
-        clicked = False
-        for btn in all_buttons:
-            try:
-                txt = btn.text.strip().lower()
-                if txt in ["next", "log in", "signin"]:
-                    js_click(driver, btn)
-                    clicked = True
-                    print(f"[SELENIUM] Clicked button: {btn.text}")
-                    break
-            except Exception:
-                continue
-        if not clicked:
-            print("[SELENIUM] No Next button found, pressing Enter")
+        # ── Click Next using XPATH text match ────────────
+        try:
+            next_btn = driver.find_element(
+                By.XPATH,
+                '//span[text()="Next"]/ancestor::button | //div[@role="button"][.//span[text()="Next"]]'
+            )
+            js_click(driver, next_btn)
+            print("[SELENIUM] Clicked Next via XPATH")
+        except Exception:
+            print("[SELENIUM] XPATH Next failed, trying Enter key")
             el.send_keys("\n")
+
     except Exception as e:
         driver.save_screenshot("/tmp/s1_fail.png")
         raise Exception(f"Username step failed: {e}")
 
-    time.sleep(5)
+    time.sleep(6)
     driver.save_screenshot("/tmp/s2_after_next.png")
     print(f"[SELENIUM] URL after Next: {driver.current_url}")
+    print(f"[SELENIUM] Page title after Next: {driver.title}")
 
     # ── Extra verification step ───────────────────────────
     try:
         extra = driver.find_element(
             By.CSS_SELECTOR, 'input[data-testid="ocfEnterTextTextInput"]'
         )
-        print("[SELENIUM] Extra verification detected, entering username...")
+        print("[SELENIUM] Extra verification, entering username...")
         js_type(driver, extra, username)
         extra.send_keys("\n")
         time.sleep(4)
     except Exception:
         print("[SELENIUM] No extra verification needed")
 
-    # ── Password — try multiple selectors ─────────────────
+    # ── Password ──────────────────────────────────────────
     print("[SELENIUM] Looking for password field...")
     driver.save_screenshot("/tmp/s3_before_password.png")
 
-    password_selectors = [
-        'input[name="password"]',
-        'input[type="password"]',
-        'input[autocomplete="current-password"]',
-        'input[data-testid="password"]',
-    ]
-
-    pw_el = None
-    for sel in password_selectors:
-        try:
-            WebDriverWait(driver, 8).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, sel))
+    try:
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located(
+                (By.XPATH, '//input[@type="password"]')
             )
-            time.sleep(2)
-            pw_el = driver.find_element(By.CSS_SELECTOR, sel)
-            print(f"[SELENIUM] Found password field: {sel}")
-            break
-        except Exception:
-            print(f"[SELENIUM] Selector failed: {sel}")
-            continue
+        )
+        time.sleep(2)
+        pw_el = driver.find_element(By.XPATH, '//input[@type="password"]')
+        print("[SELENIUM] ✅ Found password field!")
+        js_click(driver, pw_el)
+        time.sleep(1)
+        for char in password:
+            pw_el.send_keys(char)
+            time.sleep(0.1)
+        time.sleep(2)
+        driver.save_screenshot("/tmp/s4_password_typed.png")
 
-    if not pw_el:
-        # Last resort: find any password input on page
+        # Click Log in button
         try:
-            pw_el = driver.find_element(By.XPATH, '//input[@type="password"]')
-            print("[SELENIUM] Found password via XPATH")
+            login_btn = driver.find_element(
+                By.XPATH,
+                '//span[text()="Log in"]/ancestor::button | //div[@role="button"][.//span[text()="Log in"]]'
+            )
+            js_click(driver, login_btn)
+            print("[SELENIUM] Clicked Log in button")
         except Exception:
-            driver.save_screenshot("/tmp/s3_no_password.png")
-            # Print page source snippet for debugging
-            print("[SELENIUM] Page source snippet:")
-            print(driver.page_source[:2000])
-            raise Exception("Cannot find password field")
+            print("[SELENIUM] Log in button not found, pressing Enter")
+            pw_el.send_keys("\n")
 
-    js_type(driver, pw_el, password)
-    time.sleep(2)
-    driver.save_screenshot("/tmp/s4_after_password_typed.png")
-
-    # Click login button
-    all_buttons = driver.find_elements(By.XPATH, '//button | //div[@role="button"]')
-    clicked = False
-    for btn in all_buttons:
-        try:
-            txt = btn.text.strip().lower()
-            if txt in ["log in", "login", "sign in", "signin"]:
-                js_click(driver, btn)
-                clicked = True
-                print(f"[SELENIUM] Clicked: {btn.text}")
-                break
-        except Exception:
-            continue
-    if not clicked:
-        pw_el.send_keys("\n")
-        print("[SELENIUM] Pressed Enter on password")
+    except Exception as e:
+        driver.save_screenshot("/tmp/s3_password_fail.png")
+        print("[SELENIUM] Page source:")
+        print(driver.page_source[:2000])
+        raise Exception(f"Password step failed: {e}")
 
     time.sleep(8)
-    driver.save_screenshot("/tmp/s5_after_login.png")
+    driver.save_screenshot("/tmp/s5_final.png")
     print(f"[SELENIUM] Final URL: {driver.current_url}")
 
     if "login" in driver.current_url or "flow" in driver.current_url:
-        print("[SELENIUM] Page source snippet:")
-        print(driver.page_source[:3000])
-        raise Exception(f"Login failed. URL: {driver.current_url}")
+        raise Exception(f"Login failed. Still at: {driver.current_url}")
 
-    print("[SELENIUM] ✅ Login successful!")
+    print("[SELENIUM] ✅ Logged in!")
 
 def post_single_tweet(driver, text, image_path=None):
     """Post one tweet via compose page."""
